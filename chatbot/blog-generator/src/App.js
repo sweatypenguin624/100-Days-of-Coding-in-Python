@@ -4,15 +4,26 @@ import axios from "axios";
 
 const BlogGenerator = () => {
   const [topic, setTopic] = useState("");
-  const [wordCount, setWordCount] = useState(500);
-  const [tone, setTone] = useState("neutral");
+  const [wordCount, setWordCount] = useState("500"); // Keep as string for input
+  const [tone, setTone] = useState("formal");
   const [generatedBlog, setGeneratedBlog] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState(false);
 
   const handleGenerateBlog = async () => {
-    if (!topic || !wordCount || !tone) {
-      alert("Please fill in all fields");
+    const wordCountNum = Number(wordCount); // Convert to number here
+
+    // Validate inputs before sending request
+    if (!topic.trim()) {
+      alert("Please enter a blog topic");
+      return;
+    }
+    if (topic.length > 200) {
+      alert("Topic must be 200 characters or less");
+      return;
+    }
+    if (isNaN(wordCountNum) || wordCountNum <= 0 || wordCountNum > 2000) {
+      alert("Word count must be a number between 1 and 2000");
       return;
     }
 
@@ -21,17 +32,25 @@ const BlogGenerator = () => {
 
     try {
       const response = await axios.post("http://localhost:5001/generate-blog", {
-        topic,
-        wordCount,
+        topic: topic.trim(), // Trim whitespace
+        wordCount: wordCountNum, // Use validated number
         tone,
       });
 
-      setGeneratedBlog(formatBlog(response.data.blog));
+      setGeneratedBlog(formatBlog(response.data.data.blog));
     } catch (error) {
-      console.error("Error generating blog:", error);
-      alert("Failed to generate blog");
+      console.error("Error generating blog:", error.response?.data?.error || error.message);
+      alert("Failed to generate blog: " + (error.response?.data?.error || "Unknown error"));
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleWordCountChange = (e) => {
+    const value = e.target.value;
+    // Only update if empty or a valid number
+    if (value === "" || (!isNaN(Number(value)) && Number(value) <= 2000)) {
+      setWordCount(value);
     }
   };
 
@@ -45,9 +64,7 @@ const BlogGenerator = () => {
   const handleFeedback = async (isPositive) => {
     try {
       await axios.post("http://localhost:5001/submit-feedback", {
-        topic,
-        wordCount,
-        tone,
+        blog: generatedBlog.props ? generatedBlog.props.children.join('\n') : generatedBlog,
         feedback: isPositive ? "positive" : "negative",
       });
       setFeedbackGiven(true);
@@ -67,18 +84,21 @@ const BlogGenerator = () => {
           placeholder="Enter your blog topic"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
+          maxLength={200}
         />
         <Input
           type="number"
           placeholder="Number of words"
           value={wordCount}
-          onChange={(e) => setWordCount(e.target.value)}
+          onChange={handleWordCountChange}
+          min="1"
+          max="2000"
         />
         <Select value={tone} onChange={(e) => setTone(e.target.value)}>
-          <option value="neutral">Neutral</option>
-          <option value="funny">Funny</option>
-          <option value="professional">Professional</option>
-          <option value="casual">Casual</option>
+          <option value="formal">Formal</option>
+          <option value="informal">Informal</option>
+          <option value="humorous">Humorous</option>
+          <option value="serious">Serious</option>
         </Select>
         <Button onClick={handleGenerateBlog} disabled={isLoading}>
           {isLoading ? "Generating..." : "Generate Blog"}
@@ -88,13 +108,13 @@ const BlogGenerator = () => {
         <BlogContainer>
           <BlogTitle>Your Generated Blog:</BlogTitle>
           <BlogContent>{generatedBlog}</BlogContent>
-          {!feedbackGiven && (
-            <FeedbackContainer>
-              <p>Was this blog helpful?</p>
-              <FeedbackButton onClick={() => handleFeedback(true)}>👍 Yes</FeedbackButton>
-              <FeedbackButton onClick={() => handleFeedback(false)}>👎 No</FeedbackButton>
-            </FeedbackContainer>
-          )}
+          {/* {!feedbackGiven && (
+            // <FeedbackContainer>
+            //   <p>Was this blog helpful?</p>
+            //   <FeedbackButton onClick={() => handleFeedback(true)}>👍 Yes</FeedbackButton>
+            //   <FeedbackButton onClick={() => handleFeedback(false)}>👎 No</FeedbackButton>
+            // </FeedbackContainer>
+          )} */}
         </BlogContainer>
       )}
     </Container>
@@ -103,6 +123,7 @@ const BlogGenerator = () => {
 
 export default BlogGenerator;
 
+// [Styled components remain unchanged]
 const Container = styled.div`
   display: flex;
   flex-direction: column;
